@@ -2,23 +2,28 @@
 #include <LedControl.h>
 #include <pitches.h>
 
-int LED_PIN = 13;
-int BUTTON_PIN = 9;
-int BUZZER_PIN = 8;
+const int LED_PIN = 13;
+const int BUTTON_PIN = 9;
+const int BUZZER_PIN = 8;
 
-int MATRIX_NUM_ROWS = 8;
-int MATRIX_FRAME_MIN_TIME = 100;
-int MATRIX_EXPLOSION_FRAMES = 4;
-byte MATRIX_EXPLOSION_PATTERN[][8] = {
+const int MATRIX_NUM_ROWS = 8;
+const int MATRIX_FRAME_MIN_TIME = 100;
+const int MATRIX_EXPLOSION_FRAMES = 4;
+const byte MATRIX_EXPLOSION_PATTERN[][MATRIX_NUM_ROWS] = {
     {B00100100,B01000010,B10000001,B00011000,B00011000,B10000001,B01000010,B00100100},
     {B01000010,B10000001,B00011000,B00100100,B00100100,B00011000,B10000001,B01000010},
     {B10000001,B00011000,B00100100,B01000010,B01000010,B00100100,B00011000,B10000001},
     {B00011000,B00100100,B01000010,B10000001,B10000001,B01000010,B00100100,B00011000}
 };
 
+const int TONE_LOOP_NUM_NOTES = 5;
+const int TONE_LOOP_NOTES[TONE_LOOP_NUM_NOTES] = {NOTE_C5, NOTE_D5, NOTE_E5, NOTE_F5, NOTE_G5};
+
 // Firmata commands
 const byte FIRMATA_ALERT = 0x01;
 const byte FIRMATA_CHECK_BUTTON = 0x02;
+
+const int BUTTON_PRESS_TONE_DURATION_MS = 4000;
 
 /*
  Now we need a LedControl to work with.
@@ -61,7 +66,7 @@ void matrix_clear(){
 }
 
 int current_matrix_frame = 0;
-void render_matrix_explosion_frame() {
+void render_matrix_explosion_frame(){
     for(int row = 0; row < MATRIX_NUM_ROWS; row++){
         led_control.setRow(0, row, MATRIX_EXPLOSION_PATTERN[current_matrix_frame][row]);
     }
@@ -92,13 +97,24 @@ void play_tone(int note, int milliseconds){
     tone(BUZZER_PIN, note, milliseconds);
 }
 
+int current_beep_count = 0;
+int current_beep_tone = 0;
+void occasionally_beep(int beep_modulo, int beep_duration){
+    if(current_beep_count++ % beep_modulo == 0){
+        play_tone(TONE_LOOP_NOTES[current_beep_tone++], beep_duration);
+    }
+    current_beep_count = current_beep_count % beep_modulo;
+    current_beep_tone = current_beep_tone % TONE_LOOP_NUM_NOTES;
+}
+
 void test_run(){
-    int test_tone_duration = 20;
+    int test_loops = 40;
+    int test_tone_duration_ms = 20;
     int test_tone = NOTE_C5;
-    for(int i=0; i<100; i++){
+    for(int i=0; i<test_loops; i++){
         render_matrix_explosion_frame();
         if(i % 10 == 0){
-            play_tone(test_tone, test_tone_duration);
+            play_tone(test_tone, test_tone_duration_ms);
             toggle_led();
         }
     }
@@ -120,10 +136,7 @@ void firmata_sysex_callback(byte command, byte argc, byte *argv)
     switch (command) {
         case FIRMATA_ALERT:
             // First and only byte should be the alert Boolean
-            if(argv[0]){
-                play_tone(NOTE_C5, 500);
-            }
-            alert = argv[0];
+            alert = argv[0] && !alert_cancelled;
         break;
         case FIRMATA_CHECK_BUTTON:
             if(alert_cancelled){
@@ -151,9 +164,11 @@ void loop(){
     }
     if(digitalRead(BUTTON_PIN) == LOW){
         if(button_state == HIGH){
+            if(alert){
+                alert_cancelled = true;
+                play_tone(NOTE_C5, BUTTON_PRESS_TONE_DURATION_MS);
+            }
             alert = false;
-            alert_cancelled = true;
-            play_tone(NOTE_C5, 500);
         }
         button_state = LOW;
     }
@@ -162,6 +177,7 @@ void loop(){
     }
     if(alert){
         render_matrix_explosion_frame();
+        occasionally_beep(2, 20);
     }
     else{
         matrix_clear();

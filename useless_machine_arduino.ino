@@ -23,7 +23,7 @@ const int TONE_LOOP_NOTES[TONE_LOOP_NUM_NOTES] = {NOTE_C5, NOTE_D5, NOTE_E5, NOT
 const byte FIRMATA_ALERT = 0x01;
 const byte FIRMATA_CHECK_BUTTON = 0x02;
 
-const int BUTTON_PRESS_TONE_DURATION_MS = 4000;
+const int BUTTON_PRESS_TONE_DURATION_MS = 2000;
 
 /*
  Now we need a LedControl to work with.
@@ -166,7 +166,7 @@ void loop(){
         if(button_state == HIGH){
             if(alert){
                 alert_cancelled = true;
-                play_tone(NOTE_C5, BUTTON_PRESS_TONE_DURATION_MS);
+                play_tone(NOTE_C3, BUTTON_PRESS_TONE_DURATION_MS);
             }
             alert = false;
         }
